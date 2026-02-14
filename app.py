@@ -1,6 +1,23 @@
 from tkinter import *
 import tkinter as tk
+import psycopg2
 root = Tk()
+#6. creating the function for the submit button
+def entry_data(name, age, address):
+    conn = psycopg2.connect(
+        host="localhost",
+        database="postgres",
+        user="postgres",
+        password="Shadowfax@01",
+        port="5432",
+    )
+    cur = conn.cursor()
+    query = '''INSERT INTO students(name, age, address) VALUES (%s, %s, %s);'''
+    cur.execute(query,(name, age, address))
+    print(f"Inserted: {name}, {age}, {address}")
+    conn.commit()
+    cur.close()
+    display_all()
 
 #1. creating an object canvas(used for drawing shapes and graphics) and placing it in the main window
 canvas = tk.Canvas(root, width=500, height=600)
@@ -33,7 +50,7 @@ label.grid(row=3, column=0)
 entry_address = Entry(frame)
 entry_address.grid(row=3, column=1)
 
-#5. we are going to execute using labda fuction when the button is clicked bcos it executes
+#5. we are going to execute using lambda fuction when the button is clicked bcos it executes
 #5. at runtime and not at the time of button creation
 button = Button(frame, text="Submit", command=lambda: entry_data(entry_name.get(),entry_age.get(),entry_address.get()))
 button.grid(row=4, column=1)
