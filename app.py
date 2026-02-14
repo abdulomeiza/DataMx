@@ -15,6 +15,29 @@ frame.place(relx=0.5, rely=0.5, relheight=0.5, relwidth=0.5, anchor='center')
 label = Label(frame, text="Add Data: ")
 label.grid(row=0, column=1)
 
+label = Label(frame, text="Name: ")
+label.grid(row=1, column=0)
+
+entry_name = Entry(frame)
+entry_name.grid(row=1, column=1)
+
+label = Label(frame, text="Age: ")
+label.grid(row=2, column=0)
+
+entry_age = Entry(frame)
+entry_age.grid(row=2, column=1)
+
+label = Label(frame, text="Address: ")
+label.grid(row=3, column=0)
+
+entry_address = Entry(frame)
+entry_address.grid(row=3, column=1)
+
+#5. we are going to execute using labda fuction when the button is clicked bcos it executes
+#5. at runtime and not at the time of button creation
+button = Button(frame, text="Submit", command=lambda: entry_data(entry_name.get(),entry_age.get(),entry_address.get()))
+button.grid(row=4, column=1)
+
 
 
 root.mainloop()
