@@ -1,128 +1,215 @@
-from tkinter import *
 import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 import psycopg2
-root = Tk()
-#6. creating the function for the submit button
-def entry_data(name, age, address):
-    conn = psycopg2.connect(
-        host="localhost",
-        database="postgres",
-        user="postgres",
-        password="Shadowfax@01",
-        port="5432",
-    )
+import csv
+
+# -----------------------------
+# DATABASE CONFIG
+# -----------------------------
+DB_CONFIG = {
+    "host": "localhost",
+    "database": "postgres",
+    "user": "postgres",
+    "password": "Shadowfax@01",
+    "port": "5432"
+}
+
+# -----------------------------
+# DATABASE CONNECTION FUNCTION
+# -----------------------------
+def get_connection():
+    return psycopg2.connect(**DB_CONFIG)
+
+# -----------------------------
+# CRUD FUNCTIONS
+# -----------------------------
+def add_student():
+    name = entry_name.get()
+    age = entry_age.get()
+    address = entry_address.get()
+
+    if not name or not age:
+        messagebox.showwarning("Input Error", "Name and Age are required!")
+        return
+
+    conn = get_connection()
     cur = conn.cursor()
-    query = '''INSERT INTO students(name, age, address) VALUES (%s, %s, %s);'''
-    cur.execute(query,(name, age, address))
-    print(f"Inserted: {name}, {age}, {address}")
+    cur.execute(
+        "INSERT INTO students (name, age, address) VALUES (%s, %s, %s)",
+        (name, age, address)
+    )
     conn.commit()
     cur.close()
+    conn.close()
+
+    clear_entries()
     display_all()
 
 
-#8. the function is going to accept an id
-def search_data(id):
-    conn = psycopg2.connect(
-        host="localhost",
-        database="postgres",
-        user="postgres",
-        password="Shadowfax@01",
-        port="5432",
-    )
+def update_student():
+    selected = tree.focus()
+    if not selected:
+        messagebox.showwarning("Select Record", "Select a student to update")
+        return
+
+    student_id = tree.item(selected)["values"][0]
+
+    conn = get_connection()
     cur = conn.cursor()
-    # we are going to execute a query to search for the data in the database using the id provided by the user
-    # %s means substitute the value of id in the query
-    query = '''SELECT * \
-               FROM students \
-               WHERE id = %s;'''
-    cur.execute(query, (id,))
-    result = cur.fetchone()
-    #10.    then call this function here after creating the listbox
-    display_search_result(result)
+    cur.execute(
+        "UPDATE students SET name=%s, age=%s, address=%s WHERE id=%s",
+        (entry_name.get(), entry_age.get(), entry_address.get(), student_id)
+    )
     conn.commit()
     cur.close()
     conn.close()
-    #9. listbox is used to display the result of the search box on the window, we are defining a function for it
-def display_search_result(result):
-    listbox = Listbox(frame,width=25,height=7)
-    listbox.grid(row=9, column=1)
-    listbox.insert(END, result)
-    #11. this element will display all the result
-def display_all():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="postgres",
-        user="postgres",
-        password="Shadowfax@01",
-        port="5432",
-    )
+
+    display_all()
+
+
+def delete_student():
+    selected = tree.focus()
+    if not selected:
+        messagebox.showwarning("Select Record", "Select a student to delete")
+        return
+
+    student_id = tree.item(selected)["values"][0]
+
+    conn = get_connection()
     cur = conn.cursor()
-    query = '''SELECT * FROM students;'''
-    cur.execute(query)
+    cur.execute("DELETE FROM students WHERE id=%s", (student_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    display_all()
+
+
+def search_by_name():
+    name = entry_search.get()
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM students WHERE name ILIKE %s", ('%' + name + '%',))
     results = cur.fetchall()
-    listbox = Listbox(frame,width=25,height=7)
-    listbox.grid(row=10, column=1)
-    #12.    the for loop helps us loop from each row of the RESULT one after the other, like the entire list
-    # from the "results = cur.fetchall()"
-    for result in results:
-        listbox.insert(END, result)
-    conn.commit()
+
+    tree.delete(*tree.get_children())
+    for row in results:
+        tree.insert("", "end", values=row)
+
     cur.close()
     conn.close()
 
 
-#1. creating an object canvas(used for drawing shapes and graphics) and placing it in the main window
-canvas = tk.Canvas(root, width=500, height=600)
-canvas.pack()
+def display_all():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM students")
+    results = cur.fetchall()
 
-#2. A frame is a rectangular container used to group and organize other widgets
-frame = Frame(root)
-#3  we are placing the frame in the center of the canvas using the place geometry manager
-frame.place(relx=0.5, rely=0.5, relheight=0.5, relwidth=0.5, anchor='center')
+    tree.delete(*tree.get_children())
+    for row in results:
+        tree.insert("", "end", values=row)
 
-#4. placing a label inside the frame with the text "Hello, Student!"
-label = Label(frame, text="Add Data: ")
-label.grid(row=0, column=1)
+    cur.close()
+    conn.close()
 
-label = Label(frame, text="Name: ")
-label.grid(row=1, column=0)
 
-entry_name = Entry(frame)
-entry_name.grid(row=1, column=1)
+def export_to_csv():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM students")
+    results = cur.fetchall()
 
-label = Label(frame, text="Age: ")
-label.grid(row=2, column=0)
+    file_path = filedialog.asksaveasfilename(defaultextension=".csv")
+    if file_path:
+        with open(file_path, "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["ID", "Name", "Age", "Address"])
+            writer.writerows(results)
 
-entry_age = Entry(frame)
-entry_age.grid(row=2, column=1)
+    cur.close()
+    conn.close()
 
-label = Label(frame, text="Address: ")
-label.grid(row=3, column=0)
 
-entry_address = Entry(frame)
-entry_address.grid(row=3, column=1)
+def clear_entries():
+    entry_name.delete(0, tk.END)
+    entry_age.delete(0, tk.END)
+    entry_address.delete(0, tk.END)
 
-#5. we are going to execute using lambda fuction when the button is clicked bcos it executes
-#5. at runtime and not at the time of button creation
-button = Button(frame, text="Submit", command=lambda: entry_data(entry_name.get(),entry_age.get(),entry_address.get()))
-button.grid(row=4, column=1)
 
-#7. creating a label for searching through the database
-label = Label(frame, text="Search Data: ")
-label.grid(row=5, column=1)
+def select_record(event):
+    selected = tree.focus()
+    values = tree.item(selected)["values"]
+    if values:
+        clear_entries()
+        entry_name.insert(0, values[1])
+        entry_age.insert(0, values[2])
+        entry_address.insert(0, values[3])
 
-label = Label(frame, text="Search by ID: ")
-label.grid(row=6, column=0)
 
-entry_search_id = Entry(frame)
-entry_search_id.grid(row=6, column=1)
+# -----------------------------
+# GUI SETUP
+# -----------------------------
+root = tk.Tk()
+root.title("Student Management System")
+root.geometry("800x500")
+root.configure(bg="#f4f6f9")
 
-button = Button(frame, text="Search", command=lambda: search_data(entry_search_id.get()))
-button.grid(row=6, column=2)
+style = ttk.Style()
+style.theme_use("clam")
 
-#13.    then call the function
+# -----------------------------
+# FORM FRAME
+# -----------------------------
+form_frame = ttk.LabelFrame(root, text="Student Details", padding=20)
+form_frame.pack(fill="x", padx=20, pady=10)
+
+ttk.Label(form_frame, text="Name").grid(row=0, column=0, padx=10, pady=5)
+entry_name = ttk.Entry(form_frame)
+entry_name.grid(row=0, column=1, padx=10)
+
+ttk.Label(form_frame, text="Age").grid(row=1, column=0, padx=10, pady=5)
+entry_age = ttk.Entry(form_frame)
+entry_age.grid(row=1, column=1, padx=10)
+
+ttk.Label(form_frame, text="Address").grid(row=2, column=0, padx=10, pady=5)
+entry_address = ttk.Entry(form_frame)
+entry_address.grid(row=2, column=1, padx=10)
+
+# Buttons
+ttk.Button(form_frame, text="Add", command=add_student).grid(row=0, column=2, padx=10)
+ttk.Button(form_frame, text="Update", command=update_student).grid(row=1, column=2, padx=10)
+ttk.Button(form_frame, text="Delete", command=delete_student).grid(row=2, column=2, padx=10)
+ttk.Button(form_frame, text="Export CSV", command=export_to_csv).grid(row=3, column=2, padx=10)
+
+# -----------------------------
+# SEARCH FRAME
+# -----------------------------
+search_frame = ttk.LabelFrame(root, text="Search", padding=10)
+search_frame.pack(fill="x", padx=20, pady=5)
+
+entry_search = ttk.Entry(search_frame)
+entry_search.pack(side="left", padx=10)
+
+ttk.Button(search_frame, text="Search by Name", command=search_by_name).pack(side="left")
+
+# -----------------------------
+# TABLE FRAME
+# -----------------------------
+table_frame = ttk.Frame(root)
+table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+columns = ("ID", "Name", "Age", "Address")
+tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=150)
+
+tree.pack(fill="both", expand=True)
+
+tree.bind("<ButtonRelease-1>", select_record)
+
 display_all()
-
-
-
 root.mainloop()
